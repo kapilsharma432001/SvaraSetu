@@ -1,6 +1,7 @@
-import { RefreshCw, Search } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
-import { api, ApiError, type LikedItem } from "../lib/api";
+import { CheckSquare, RefreshCw, Search, Square, Trash2 } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { api, ApiError, saveSelectedVideoIds, selectedVideoIds, type LikedItem } from "../lib/api";
 
 const PAGE_SIZE = 50;
 
@@ -11,8 +12,14 @@ export default function LikedSongsPage() {
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(selectedVideoIds()));
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const visibleSelectedCount = useMemo(
+    () => items.filter((item) => selectedIds.has(item.video_id)).length,
+    [items, selectedIds],
+  );
 
   async function loadItems(nextOffset = offset) {
     setLoading(true);
@@ -60,6 +67,28 @@ export default function LikedSongsPage() {
     setAppliedQuery(query.trim());
   }
 
+  function updateSelection(next: Set<string>) {
+    setSelectedIds(next);
+    saveSelectedVideoIds([...next]);
+  }
+
+  function toggleSelected(videoId: string) {
+    const next = new Set(selectedIds);
+    if (next.has(videoId)) next.delete(videoId);
+    else next.add(videoId);
+    updateSelection(next);
+  }
+
+  function selectVisible() {
+    const next = new Set(selectedIds);
+    items.forEach((item) => next.add(item.video_id));
+    updateSelection(next);
+  }
+
+  function clearSelection() {
+    updateSelection(new Set());
+  }
+
   const pageEnd = Math.min(offset + PAGE_SIZE, total);
 
   return (
@@ -94,13 +123,35 @@ export default function LikedSongsPage() {
 
       <div className="count-row">
         <span>{total} liked items</span>
+        <span>{selectedIds.size} selected</span>
         <span>{total ? `${offset + 1}-${pageEnd}` : "0-0"}</span>
+      </div>
+
+      <div className="selection-bar">
+        <div>
+          <strong>{selectedIds.size} selected for copy</strong>
+          <span>{visibleSelectedCount} selected on this page</span>
+        </div>
+        <div className="button-row">
+          <button className="button secondary" onClick={selectVisible} disabled={!items.length} title="Select all visible rows">
+            <CheckSquare size={18} />
+            Select page
+          </button>
+          <button className="button secondary" onClick={clearSelection} disabled={!selectedIds.size} title="Clear selected songs">
+            <Trash2 size={18} />
+            Clear
+          </button>
+          <Link className="button primary" to="/copy">
+            Use selected
+          </Link>
+        </div>
       </div>
 
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
+              <th>Select</th>
               <th>Video</th>
               <th>Channel / Artist</th>
               <th>Availability</th>
@@ -110,6 +161,15 @@ export default function LikedSongsPage() {
           <tbody>
             {items.map((item) => (
               <tr key={item.id}>
+                <td>
+                  <button
+                    className="icon-button"
+                    onClick={() => toggleSelected(item.video_id)}
+                    title={selectedIds.has(item.video_id) ? "Remove from selected songs" : "Select song"}
+                  >
+                    {selectedIds.has(item.video_id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                  </button>
+                </td>
                 <td>
                   <div className="video-cell">
                     {item.thumbnail_url ? <img src={item.thumbnail_url} alt="" /> : <div className="thumb-placeholder" />}
@@ -129,7 +189,7 @@ export default function LikedSongsPage() {
             ))}
             {!items.length && (
               <tr>
-                <td colSpan={4} className="empty-cell">No liked songs stored yet.</td>
+                <td colSpan={5} className="empty-cell">No liked songs stored yet.</td>
               </tr>
             )}
           </tbody>
@@ -147,4 +207,3 @@ export default function LikedSongsPage() {
     </section>
   );
 }
-

@@ -72,8 +72,27 @@ class PlaylistOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class CopyStartRequest(BaseModel):
+class CopySelectionRequest(BaseModel):
     playlist_db_id: int | None = None
+    video_ids: list[str] | None = None
+    last_n: int | None = Field(default=None, ge=1, le=5000)
+
+
+class CopyStartRequest(CopySelectionRequest):
+    pass
+
+
+class CopyEstimateRequest(CopySelectionRequest):
+    pass
+
+
+class CopyEstimateResponse(BaseModel):
+    items_selected: int
+    estimated_copy_quota: int
+    estimated_days: int
+    daily_quota: int
+    insert_quota_per_item: int
+    mode: str
 
 
 class CopyResumeRequest(BaseModel):
@@ -101,4 +120,3 @@ class CopyStartResponse(BaseModel):
     job: CopyJobStatusResponse
     started: bool
     message: str
-

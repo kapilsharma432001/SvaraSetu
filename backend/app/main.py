@@ -15,6 +15,8 @@ from .logging_config import configure_logging
 from .schemas import (
     AuthStartResponse,
     AuthStatusResponse,
+    CopyEstimateRequest,
+    CopyEstimateResponse,
     CopyJobStatusResponse,
     CopyResumeRequest,
     CopyStartRequest,
@@ -28,12 +30,12 @@ from .schemas import (
 from .services import (
     build_copy_status,
     create_destination_playlist,
+    create_copy_job,
+    estimate_copy_selection,
     fetch_and_store_liked_items,
     get_copy_job,
-    get_or_create_copy_job,
     list_liked_items,
     run_copy_job,
-    sync_copy_job_items,
 )
 from .youtube import QUOTA_EXCEEDED_MESSAGE, is_quota_error, parse_http_error
 
@@ -162,7 +164,12 @@ def copy_start(
     payload: CopyStartRequest | None = None,
     db: Session = Depends(get_db),
 ) -> CopyStartResponse:
-    job = get_or_create_copy_job(db, payload.playlist_db_id if payload else None)
+    job = create_copy_job(
+        db,
+        payload.playlist_db_id if payload else None,
+        video_ids=payload.video_ids if payload else None,
+        last_n=payload.last_n if payload else None,
+    )
     started = _enqueue_copy_job(background_tasks, job.id)
     response = build_copy_status(db, job)
     return CopyStartResponse(
@@ -179,8 +186,6 @@ def copy_resume(
     db: Session = Depends(get_db),
 ) -> CopyStartResponse:
     job = get_copy_job(db, payload.job_id if payload else None)
-    sync_copy_job_items(db, job)
-    db.commit()
     started = _enqueue_copy_job(background_tasks, job.id)
     response = build_copy_status(db, job)
     return CopyStartResponse(
@@ -194,3 +199,12 @@ def copy_resume(
 def copy_status(job_id: int | None = None, db: Session = Depends(get_db)) -> CopyJobStatusResponse:
     job = get_copy_job(db, job_id)
     return build_copy_status(db, job)
+
+
+@app.post("/copy/estimate", response_model=CopyEstimateResponse)
+def copy_estimate(payload: CopyEstimateRequest | None = None, db: Session = Depends(get_db)) -> CopyEstimateResponse:
+    return estimate_copy_selection(
+        db,
+        video_ids=payload.video_ids if payload else None,
+        last_n=payload.last_n if payload else None,
+    )

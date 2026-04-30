@@ -423,6 +423,30 @@ select:focus {
   color: #5a6670;
 }
 
+.selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #d8dee5;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.selection-bar > div:first-child,
+.selected-summary {
+  display: grid;
+  gap: 4px;
+}
+
+.selection-bar span,
+.selected-summary span,
+.estimate-grid span {
+  color: #69757f;
+  font-size: 0.86rem;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid #d8dee5;
@@ -575,6 +599,45 @@ label,
   gap: 18px;
 }
 
+.copy-filter-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.filter-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.copy-filter-grid,
+.estimate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.selected-summary,
+.estimate-grid > div {
+  min-height: 70px;
+  padding: 14px;
+  border: 1px solid #e0e6ec;
+  border-radius: 8px;
+  background: #f5f7fa;
+}
+
+.selected-summary strong,
+.estimate-grid strong {
+  color: #153f36;
+  font-size: 1.25rem;
+}
+
+.selected-summary a {
+  color: #153f36;
+  font-weight: 700;
+}
+
 .progress-header {
   display: flex;
   align-items: flex-start;
@@ -640,13 +703,17 @@ label,
   .step-grid,
   .toolbar,
   .meta-grid,
-  .metric-grid {
+  .metric-grid,
+  .copy-filter-grid,
+  .estimate-grid {
     grid-template-columns: 1fr;
   }
 
   .page-heading.with-action,
   .compact-panel,
-  .progress-header {
+  .progress-header,
+  .selection-bar,
+  .filter-header {
     flex-direction: column;
     align-items: stretch;
   }
@@ -655,4 +722,3 @@ label,
     grid-template-columns: 1fr;
   }
 }
-
