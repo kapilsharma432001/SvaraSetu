@@ -33,3 +33,6 @@ frontend/.env
 .idea/
 .vscode/
 
+# Personal flow / notes (not committed)
+FLOW.md
+

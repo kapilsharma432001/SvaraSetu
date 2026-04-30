@@ -13,6 +13,8 @@ The app uses the official YouTube Data API v3. It does not scrape YouTube.
 - Creates a destination playlist with `playlists.insert`.
 - Adds videos one at a time with `playlistItems.insert`.
 - Tracks copied, skipped, failed, and pending items so a copy job can resume after app restarts or quota exhaustion.
+- Supports copying all fetched liked songs, manually selected songs, or the last N liked songs.
+- Shows a quota estimate before starting a copy job.
 
 `playlistItems.insert` costs 50 quota units per video. If YouTube returns quota exhaustion, the app stops the job and shows:
 
@@ -81,10 +83,19 @@ http://localhost:5173
 1. Open the app and go to **Auth**.
 2. Connect your Google account.
 3. Go to **Liked Songs** and fetch liked songs.
-4. Go to **Playlist**, keep the default title `Kapil's Shared Liked Songs` or enter another title, and create the playlist.
-5. Go to **Copy** and start the copy job.
-6. If quota is exceeded, come back later and press **Resume**.
-7. Go to **Success** to copy the playlist URL.
+4. Go to **Playlist**, enter the playlist title you want, and create the playlist.
+5. Go to **Liked Songs** if you want to select individual songs for copying.
+6. Go to **Copy**, choose the copy filter, review the quota estimate, and start the copy job.
+7. If quota is exceeded, come back later and press **Resume**.
+8. Go to **Success** to copy the playlist URL.
+
+For example, 594 selected items estimates as:
+
+```text
+Items selected: 594
+Estimated copy quota: 29,700 units
+Estimated days: 3
+```
 
 The share URL format is:
 
@@ -103,6 +114,7 @@ https://www.youtube.com/playlist?list=<PLAYLIST_ID>
 - `POST /playlists/create`
 - `POST /copy/start`
 - `POST /copy/resume`
+- `POST /copy/estimate`
 - `GET /copy/status`
 
 ## Safety Notes

@@ -65,6 +65,21 @@ export type CopyStartResponse = {
   message: string;
 };
 
+export type CopySelectionPayload = {
+  playlist_db_id?: number;
+  video_ids?: string[];
+  last_n?: number;
+};
+
+export type CopyEstimate = {
+  items_selected: number;
+  estimated_copy_quota: number;
+  estimated_days: number;
+  daily_quota: number;
+  insert_quota_per_item: number;
+  mode: string;
+};
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -105,10 +120,15 @@ export const api = {
   },
   createPlaylist: (payload: { title: string; privacy_status: "private" | "public" | "unlisted" }) =>
     request<Playlist>("/playlists/create", { method: "POST", body: JSON.stringify(payload) }),
-  copyStart: (playlistDbId?: number) =>
+  copyEstimate: (payload: CopySelectionPayload) =>
+    request<CopyEstimate>("/copy/estimate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  copyStart: (payload: CopySelectionPayload = {}) =>
     request<CopyStartResponse>("/copy/start", {
       method: "POST",
-      body: JSON.stringify(playlistDbId ? { playlist_db_id: playlistDbId } : {}),
+      body: JSON.stringify(payload),
     }),
   copyResume: (jobId?: number) =>
     request<CopyStartResponse>("/copy/resume", {
@@ -134,3 +154,17 @@ export function lastJobId(): number | undefined {
   return value ? Number(value) : undefined;
 }
 
+export function saveSelectedVideoIds(videoIds: string[]): void {
+  localStorage.setItem("svarasetu.selectedVideoIds", JSON.stringify(videoIds));
+}
+
+export function selectedVideoIds(): string[] {
+  const value = localStorage.getItem("svarasetu.selectedVideoIds");
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}

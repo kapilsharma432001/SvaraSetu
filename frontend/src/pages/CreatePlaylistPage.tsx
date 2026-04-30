@@ -1,7 +1,7 @@
 import { ListPlus, Lock, Unlock, Users, type LucideIcon } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, ApiError, saveLastJob, type Playlist } from "../lib/api";
+import { api, ApiError, type Playlist } from "../lib/api";
 
 type Privacy = "unlisted" | "private" | "public";
 
@@ -12,7 +12,7 @@ const privacyOptions: Array<{ value: Privacy; label: string; icon: LucideIcon }>
 ];
 
 export default function CreatePlaylistPage() {
-  const [title, setTitle] = useState("Kapil's Shared Liked Songs");
+  const [title, setTitle] = useState(localStorage.getItem("svarasetu.lastPlaylistTitle") ?? "");
   const [privacy, setPrivacy] = useState<Privacy>("unlisted");
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(false);
@@ -26,6 +26,7 @@ export default function CreatePlaylistPage() {
     try {
       const response = await api.createPlaylist({ title: title.trim(), privacy_status: privacy });
       setPlaylist(response);
+      localStorage.setItem("svarasetu.lastPlaylistTitle", response.title);
       localStorage.setItem("svarasetu.lastPlaylistDbId", String(response.id));
       localStorage.setItem("svarasetu.lastShareUrl", response.share_url);
       setMessage("Playlist created.");
@@ -37,20 +38,9 @@ export default function CreatePlaylistPage() {
     }
   }
 
-  async function startCopy() {
+  function chooseCopyFilter() {
     if (!playlist) return;
-    setLoading(true);
-    setMessage(null);
-    try {
-      const response = await api.copyStart(playlist.id);
-      saveLastJob(response.job);
-      navigate(`/copy?job_id=${response.job.job_id}`);
-    } catch (error) {
-      if (error instanceof ApiError) setMessage(error.message);
-      else setMessage("Could not start copy job.");
-    } finally {
-      setLoading(false);
-    }
+    navigate("/copy");
   }
 
   return (
@@ -65,7 +55,13 @@ export default function CreatePlaylistPage() {
       <form className="tool-panel form-panel" onSubmit={submit}>
         <label>
           <span>Playlist title</span>
-          <input value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={150} />
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            required
+            maxLength={150}
+            placeholder="Kapil's Shared Liked Songs"
+          />
         </label>
 
         <div className="field-group">
@@ -89,7 +85,7 @@ export default function CreatePlaylistPage() {
           </div>
         </div>
 
-        <button className="button primary" type="submit" disabled={loading}>
+        <button className="button primary" type="submit" disabled={loading || !title.trim()}>
           <ListPlus size={18} />
           Create playlist
         </button>
@@ -101,8 +97,8 @@ export default function CreatePlaylistPage() {
             <h2>{playlist.title}</h2>
             <p>{playlist.share_url}</p>
           </div>
-          <button className="button primary" onClick={startCopy} disabled={loading}>
-            Start copying
+          <button className="button primary" onClick={chooseCopyFilter} disabled={loading}>
+            Choose copy filter
           </button>
         </div>
       )}

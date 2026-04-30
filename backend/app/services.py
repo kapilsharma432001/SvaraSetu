@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 from .auth import AuthRequiredError, load_credentials
 from .database import SessionLocal
 from .models import CopyJob, CopyJobItem, LikedItem, Playlist, utc_now
-from .schemas import CopyJobStatusResponse
+from .schemas import CopyEstimateResponse, CopyJobStatusResponse
 from .youtube import (
     QUOTA_EXCEEDED_MESSAGE,
     create_playlist,
@@ -27,6 +27,8 @@ from .youtube import (
 )
 
 logger = logging.getLogger(__name__)
+INSERT_QUOTA_PER_ITEM = 50
+DEFAULT_DAILY_QUOTA = 10_000
 
 
 def fetch_and_store_liked_items(db: Session) -> tuple[str, int, int]:
@@ -108,21 +110,79 @@ def get_playlist_or_latest(db: Session, playlist_db_id: int | None) -> Playlist:
     return playlist
 
 
-def get_or_create_copy_job(db: Session, playlist_db_id: int | None) -> CopyJob:
+def selected_liked_items(db: Session, video_ids: list[str] | None = None, last_n: int | None = None) -> list[LikedItem]:
+    statement = select(LikedItem).order_by(LikedItem.position.asc())
+    all_items = list(db.scalars(statement).all())
+    if not all_items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fetch liked songs before starting a copy job.")
+
+    if video_ids is not None:
+        selected_ids = set(video_ids)
+        all_items = [item for item in all_items if item.video_id in selected_ids]
+    elif last_n:
+        all_items = all_items[:last_n]
+
+    deduped_items: list[LikedItem] = []
+    seen_video_ids: set[str] = set()
+    for liked_item in all_items:
+        if liked_item.video_id in seen_video_ids:
+            continue
+        seen_video_ids.add(liked_item.video_id)
+        deduped_items.append(liked_item)
+    return deduped_items
+
+
+def selection_mode(video_ids: list[str] | None = None, last_n: int | None = None) -> str:
+    if video_ids is not None:
+        return "selected"
+    if last_n:
+        return f"last_{last_n}"
+    return "all"
+
+
+def estimate_copy_selection(db: Session, video_ids: list[str] | None = None, last_n: int | None = None) -> CopyEstimateResponse:
+    items = selected_liked_items(db, video_ids=video_ids, last_n=last_n)
+    estimated_quota = len(items) * INSERT_QUOTA_PER_ITEM
+    estimated_days = max((estimated_quota + DEFAULT_DAILY_QUOTA - 1) // DEFAULT_DAILY_QUOTA, 1) if estimated_quota else 0
+    return CopyEstimateResponse(
+        items_selected=len(items),
+        estimated_copy_quota=estimated_quota,
+        estimated_days=estimated_days,
+        daily_quota=DEFAULT_DAILY_QUOTA,
+        insert_quota_per_item=INSERT_QUOTA_PER_ITEM,
+        mode=selection_mode(video_ids=video_ids, last_n=last_n),
+    )
+
+
+def create_copy_job(db: Session, playlist_db_id: int | None, video_ids: list[str] | None = None, last_n: int | None = None) -> CopyJob:
     playlist = get_playlist_or_latest(db, playlist_db_id)
-    job = db.scalars(
-        select(CopyJob)
-        .where(CopyJob.destination_playlist_db_id == playlist.id)
-        .order_by(CopyJob.id.desc())
-        .limit(1)
-    ).first()
-    if job is None:
-        job = CopyJob(destination_playlist_db_id=playlist.id, status="pending")
-        db.add(job)
-        db.flush()
-    sync_copy_job_items(db, job)
+    liked_items = selected_liked_items(db, video_ids=video_ids, last_n=last_n)
+    if not liked_items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No liked songs matched the selected copy filter.")
+
+    mode = selection_mode(video_ids=video_ids, last_n=last_n)
+    job = CopyJob(
+        destination_playlist_db_id=playlist.id,
+        status="pending",
+        message=f"Created {mode} copy job.",
+    )
+    db.add(job)
+    db.flush()
+    for liked_item in liked_items:
+        liked_item.copied_status = "pending"
+        liked_item.error_message = None
+        db.add(
+            CopyJobItem(
+                copy_job_id=job.id,
+                liked_item_id=liked_item.id,
+                video_id=liked_item.video_id,
+                status="pending",
+            )
+        )
     db.commit()
     db.refresh(job)
+    recalculate_job_counts(db, job)
+    db.commit()
     return job
 
 
