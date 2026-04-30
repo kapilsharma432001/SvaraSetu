@@ -40,6 +40,7 @@ def build_flow(state: str | None = None) -> Flow:
         scopes=[settings.youtube_scope],
         state=state,
         redirect_uri=settings.oauth_redirect_uri,
+        autogenerate_code_verifier=False,
     )
     return flow
 
